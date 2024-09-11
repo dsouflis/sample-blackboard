@@ -2,8 +2,9 @@
 
 This is a prototype for an implementation of a blackboard architecture, running a sample blackboard
 which is solving a specific problem. It is based on [rete-next](https://github.com/dsouflis/rete-next), 
-another project of mine that implements a Rete engine. The knowledge base maintained by Rete is the *blackboard*, 
-the shared data structure through which individual modules, the *knowledge sources*, collaborate.
+another project of mine that implements a Rete engine. 
+The knowledge base maintained by Rete serves as the *blackboard*, the shared data structure through 
+which individual modules, the *knowledge sources*, collaborate.
 
 The knowledge sources are heterogeneous, each providing a unique expertise to the problem. In the sample blackboard,
 two of the knowledge sources consult ChatGPT, and two others implement regular code. The knowledge sources
@@ -18,7 +19,7 @@ among knowledge sources that is dictated by the Scheduler and the Resolver, unti
 productions. The run is considered successful when the Scheduler considers the state of the problem-solving
 process to be in a final state.
 
-The above components will be detailed on the concrete example of the sample blabkboard.
+The above components will be detailed during the description of a concrete run of the sample blackboard.
 
 ## How to run
 
@@ -47,7 +48,8 @@ removed, and can decide on its own if it will handle all or some of them.
 
 ### Knowledge Source 1
 KS 1 is responsible for retrieving the information about which species in our set eats which other. We need this
-information because we want to transfer species together with safety. It defines the following productions:
+information because we want to transfer animals of different species together with safety. 
+It defines the following productions:
 
 ```
 ((<x> species <s>) -{(species <s> -)} -> "ks1 gather species")
@@ -75,11 +77,9 @@ Knowledge Source 3 is responsible for arranging trips, while honoring the constr
 ((animal <a> -) -{(<t> includes <a>)} -> "start trip")
 (
  (trip <t> -) 
- (<t> includes <a>)
  (<wt> <- #sum(<w>)) from {(<t> includes <aa>) (<aa> species <ss>) (<ss> weight <w>)}
  (animal <b> -) 
  -{(trip <t2> -) (<t2> includes <b>)} 
- (<a> species <s>) 
  (<b> species <s2>) 
  -{(<t> includes <aa>) (<aa> species <ss>) (<s2> eats <ss>)} 
  -{(<t> includes <aa>) (<aa> species <ss>) (<ss> eats <s2>)} 
@@ -90,7 +90,10 @@ Knowledge Source 3 is responsible for arranging trips, while honoring the constr
 )
 ```
 
-The logics of this knowledge source do not invoke any external API. The syntax for negation is exactly like that
+The logics of this knowledge source do not invoke any external API. 
+
+The second production is a bit convoluted, because it must implement a complex query.
+The syntax for negation is exactly like that
 used in [Robert B. Doorenbos' PhD Thesis: Production Matching for Large Learning Systems](http://reports-archive.adm.cs.cmu.edu/anon/1995/CMU-CS-95-113.pdf)
 but the syntax for aggregates is my own, so here's a breakdown so that you can follow along:
 
@@ -144,7 +147,7 @@ returns a random production among the available ones.
 
 ## Trace of a run
 
-Let us know watch all components, described above, work together to solve this problem.
+Let us now watch all components, described above, work together to solve this problem.
 
 The input data are the following:
 
@@ -236,6 +239,9 @@ This knowledge source uses the following 'assistant' directive with ChatGPT:
 
 > Given a species, respond with the average weight of an individual of the species in kilograms.
 Respond with just a number, without other words or punctuation.
+
+These facts are added during these steps (notice that exact numbers may vary from run to run): 
+`(rabbit weight 2) (wolf weight 40) (snake weight 1.5)`.
 
 We are now in the trickiest part of the scheduling regex, so I will ask your attention.
 At first, only production "start trip" is eligible.

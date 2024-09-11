@@ -165,11 +165,9 @@ const knowledgeSource3: KnowledgeSource = {
 ((animal <a> -) -{(<t> includes <a>)} -> "start trip")
 (
  (trip <t> -) 
- (<t> includes <a>)
  (<wt> <- #sum(<w>)) from {(<t> includes <aa>) (<aa> species <ss>) (<ss> weight <w>)}
  (animal <b> -) 
  -{(trip <t2> -) (<t2> includes <b>)} 
- (<a> species <s>) 
  (<b> species <s2>) 
  -{(<t> includes <aa>) (<aa> species <ss>) (<s2> eats <ss>)} 
  -{(<t> includes <aa>) (<aa> species <ss>) (<ss> eats <s2>)} 
