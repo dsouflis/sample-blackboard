@@ -444,49 +444,6 @@ main = a1+ a2 a3+ (a4 a5*)+;
 
   // ## Run Blackboard
   await runBlackboard(scheduler, resolver, rete);
-
-  if(false) {
-    rete.add("trip", "t1", "-");
-    rete.add("t1", "includes", "a1");
-
-    const input = `
-(
-(trip <t> -) 
-(<t> includes <a>)
-(<wt> <- #sum(<w>)) from {(<t> includes <aa>) (<aa> species <ss>) (<ss> weight <w>)}
-(animal <b> -) 
--{(trip <t2> -) (<t2> includes <b>)} 
-(<a> species <s>) 
-(<b> species <s2>) 
--{(<t> includes <aa>) (<aa> species <ss>) (<s2> eats <ss>)} 
--{(<t> includes <aa>) (<aa> species <ss>) (<ss> eats <s2>)} 
-(<s> weight <w>)
-(<s2> weight <w2>)
-((<w> + <w2>) < 100)
- -> "p5")
-    `;
-    const reteParse: ParseError | ParseSuccess = parseRete(input);
-    if((reteParse as ParseError).error) {
-      console.log((reteParse as ParseError).error);
-      throw new Error('Could not parse productions');
-    } else {
-      console.log('Parsed productions');
-    }
-    const parsed = reteParse as ParseSuccess;
-
-    const productions: any[] = [];
-    for (const {lhs, rhs} of parsed.specs) {
-      let p = rete.addProduction(lhs, rhs);
-      let variables = getVariables(lhs);
-      let locationsOfVariablesInConditions = getLocationsOfVariablesInConditions(variables, lhs);
-      productions.push({ production: p, locations: locationsOfVariablesInConditions,});
-      console.log('Added production:', rhs);
-      const items = p.items;
-      console.log(items.map(t => t.toString()).join('\n'));
-    }
-  }
-
-
 }
 
 main();
