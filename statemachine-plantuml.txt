@@ -1,0 +1,18 @@
+@startuml
+state State1
+state State2
+state State3
+state State4
+state State5
+
+[*] --> State1
+State1 -left-> State2: "ks1 gather species"
+State2 --> State2: "ks1 gather species"
+State2 --> State3: "ks1 determine food chain"
+State3 -right-> State4: "ks2 determine average weight"
+State4 --> State4: "ks2 determine average weight"
+State4 --> State5: "start trip"
+State5 --> State5: "start trip"
+State5 --> State5: "add compatible animal to trip"
+State5 --> [*]
+@enduml

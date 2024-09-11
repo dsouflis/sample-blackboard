@@ -39,6 +39,12 @@ async function getOpenAiResponse(system: string, user: string) {
   return response.choices[0].message;
 }
 
+let gensymN = 0;
+
+function gensym() {
+  return `gensym${gensymN++}`;
+}
+
 type ProductionData = { production: ProductionNode, locations: LocationsOfVariablesInConditions, logic: ProductionLogic };
 type ProductionDataArray = ProductionData[];
 
@@ -154,6 +160,62 @@ const knowledgeSource2: KnowledgeSource = {
   ],
 };
 
+const knowledgeSource3: KnowledgeSource = {
+  productionsText: `
+((animal <a> -) -{(<t> includes <a>)} -> "start trip")
+(
+ (trip <t> -) 
+ (<t> includes <a>)
+ (<wt> <- #sum(<w>)) from {(<t> includes <aa>) (<aa> species <ss>) (<ss> weight <w>)}
+ (animal <b> -) 
+ -{(trip <t2> -) (<t2> includes <b>)} 
+ (<a> species <s>) 
+ (<b> species <s2>) 
+ -{(<t> includes <aa>) (<aa> species <ss>) (<s2> eats <ss>)} 
+ -{(<t> includes <aa>) (<aa> species <ss>) (<ss> eats <s2>)} 
+ (<s> weight <w>)
+ (<s2> weight <w2>)
+ ((<w> + <w2>) < 100)
+ -> "add compatible animal to trip"
+)
+    `,
+  productionLogics: [
+    async (rete, tokens, production, locations) => {
+      const tokensEligibleToBeAdded = tokens[0];
+      let token = tokensEligibleToBeAdded[0];
+      let willFire = production.willFireTokenAdded(token);
+      if (willFire) {
+        let evalVariables = evalVariablesInToken(['a'], locations, token);
+        let animal = evalVariables['a'];
+        if (animal !== null) {
+          const trip = gensym();
+          rete.add('trip', trip, '-');
+          rete.add(trip, 'includes', animal);
+          console.log('Added trip', trip, 'with', animal);
+        }
+      } else {
+        console.log('Production was fired but the token is no longer available:', token.toString());
+      }
+    },
+    async (rete, tokens, production, locations) => {
+      const tokensEligibleToBeAdded = tokens[0];
+      let token = tokensEligibleToBeAdded[0];
+      let willFire = production.willFireTokenAdded(token);
+      if (willFire) {
+        let evalVariables = evalVariablesInToken(['t', 'b'], locations, token);
+        const trip = evalVariables['t'];
+        const animal = evalVariables['b'];
+        if (animal !== null && trip !== null) {
+          rete.add(trip, 'includes', animal);
+          console.log('To trip', trip, 'we added', animal);
+        }
+      } else {
+        console.log('Production was fired but the token is no longer available:', token.toString());
+      }
+    },
+  ],
+};
+
 function getVariables(lhs: GenericCondition[]): string[] {
   let set = new Set<string>();
   for (const cond of lhs) {
@@ -201,9 +263,10 @@ function explainStateMachine(stateMachine: StateMachine, allProductions: Product
   for (let i = 1; i < stateTable.length; i++) {
     console.log(`State s${i}`, stateMachine.accepting[i] ? '(Accepting)' : '');
     let transitions = stateTable[i];
-    let indexOfTransitionToSelf = transitions.findIndex(s => s === i);
-    if(indexOfTransitionToSelf !== -1) {
-      console.log(` Transition to self with p${indexOfTransitionToSelf}`);
+    for (let t = 0; t < allProductions.length; t++) {
+      if(transitions[t] === i) {
+        console.log(` Transition to self with p${t}`);
+      }
     }
     for (let t = 0; t < allProductions.length; t++) {
       if(transitions[t] !== i && transitions[t] != 0) {
@@ -223,11 +286,41 @@ type ConflictItem = {
   symbol: number,
   productionDatum: ProductionData,
   tokensToAddOrRemove: [Token[], Token[]],
+  isSelfTransition: boolean,
 }
 
-class Resolver {
+interface Resolver {
+  resolveConflicts(conflictSet: ConflictItem[]): ConflictItem;
+}
+
+class TrivialResolver implements Resolver {
   resolveConflicts(conflictSet: ConflictItem[]) {
     return conflictSet[0]; //Trivial resolver for now
+  }
+}
+
+class SelfTransitionResolver extends TrivialResolver {
+  resolveConflicts(conflictSet: ConflictItem[]): ConflictItem {
+    const selfTransition = conflictSet.find(c => c.isSelfTransition);
+    if (selfTransition) {
+      return selfTransition;
+    }
+    return super.resolveConflicts(conflictSet);
+  }
+}
+
+class OverridingSelfTransitionResolver extends SelfTransitionResolver {
+  constructor(private overridingTransitions: number[]) {
+   super();
+  }
+  resolveConflicts(conflictSet: ConflictItem[]): ConflictItem {
+    for (const overridingTransition of this.overridingTransitions) {
+      const found = conflictSet.find(c => c.symbol === overridingTransition);
+      if(found) {
+        return found;
+      }
+    }
+    return super.resolveConflicts(conflictSet);
   }
 }
 
@@ -248,25 +341,10 @@ class RegexScheduler {
       console.log('No transitions exist');
       return [];
     }
-    let indexOfTransitionToSelf = transitions.findIndex(s => s === this.currentState);
-    if (indexOfTransitionToSelf !== -1) { //Transition to self is always favored
-      let productionDatum = this.allProductions[indexOfTransitionToSelf];
-      let canFire = productionDatum.production.canFire();
-      if(canFire[0].length) {
-        console.log(`Self-transition "${productionDatum.production.rhs}" can fire`);
-        return [
-          {
-            symbol: indexOfTransitionToSelf,
-            productionDatum: productionDatum,
-            tokensToAddOrRemove: canFire,
-          }
-        ];
-      }
-      // Else it falls through and looks for any non-self transition
-    }
     const ret: ConflictItem[] = [];
+
     for (let t = 0; t < this.allProductions.length; t++) {
-      if(transitions[t] !== this.currentState && transitions[t] != 0) {
+      if(transitions[t] != 0) {
         let productionDatum = this.allProductions[t];
         let canFire = productionDatum.production.canFire();
         if(canFire[0].length) {
@@ -275,6 +353,7 @@ class RegexScheduler {
               symbol: t,
               productionDatum: productionDatum,
               tokensToAddOrRemove: canFire,
+              isSelfTransition: transitions[t] === this.currentState,
             }
           );
         }
@@ -327,8 +406,9 @@ async function main() {
   // ## Registering Knowledge Sources and constructing the set of all productions
   let ks1 = registerKnowledgeSource(rete, knowledgeSource1);
   let ks2 = registerKnowledgeSource(rete, knowledgeSource2);
+  let ks3 = registerKnowledgeSource(rete, knowledgeSource3);
 
-  const knowledgeSources = [ks1, ks2];
+  const knowledgeSources = [ks1, ks2, ks3];
   let allProductions: ProductionData[] = [];
   for (const knowledgeSource of knowledgeSources) {
     allProductions = [...allProductions, ...knowledgeSource.productions];
@@ -336,15 +416,17 @@ async function main() {
 
   // ## Constructing the statemachine of allowed sequence of productions
   const schedulerRegex = `# define symbols
-a1   = 0; # First production of KS 0
-a2   = 1; # Second production of KS 0
-a3   = 2; # First production of KS 1
+a1   = 0; # First production of KS 1
+a2   = 1; # Second production of KS 1
+a3   = 2; # First production of KS 2
+a4   = 3; # First production of KS 3
+a5   = 4; # Second production of KS 3
 
 # define main state machine pattern
-main = a1+ a2 a3+;
+main = a1+ a2 a3+ (a4 a5*)+;
 `;
   const scheduler = new RegexScheduler(schedulerRegex, allProductions);
-  let resolver = new Resolver();
+  let resolver = new OverridingSelfTransitionResolver([4]);
 
   // ## Add initial data
   rete.add('animal', 'a1', '-');
@@ -362,6 +444,49 @@ main = a1+ a2 a3+;
 
   // ## Run Blackboard
   await runBlackboard(scheduler, resolver, rete);
+
+  if(false) {
+    rete.add("trip", "t1", "-");
+    rete.add("t1", "includes", "a1");
+
+    const input = `
+(
+(trip <t> -) 
+(<t> includes <a>)
+(<wt> <- #sum(<w>)) from {(<t> includes <aa>) (<aa> species <ss>) (<ss> weight <w>)}
+(animal <b> -) 
+-{(trip <t2> -) (<t2> includes <b>)} 
+(<a> species <s>) 
+(<b> species <s2>) 
+-{(<t> includes <aa>) (<aa> species <ss>) (<s2> eats <ss>)} 
+-{(<t> includes <aa>) (<aa> species <ss>) (<ss> eats <s2>)} 
+(<s> weight <w>)
+(<s2> weight <w2>)
+((<w> + <w2>) < 100)
+ -> "p5")
+    `;
+    const reteParse: ParseError | ParseSuccess = parseRete(input);
+    if((reteParse as ParseError).error) {
+      console.log((reteParse as ParseError).error);
+      throw new Error('Could not parse productions');
+    } else {
+      console.log('Parsed productions');
+    }
+    const parsed = reteParse as ParseSuccess;
+
+    const productions: any[] = [];
+    for (const {lhs, rhs} of parsed.specs) {
+      let p = rete.addProduction(lhs, rhs);
+      let variables = getVariables(lhs);
+      let locationsOfVariablesInConditions = getLocationsOfVariablesInConditions(variables, lhs);
+      productions.push({ production: p, locations: locationsOfVariablesInConditions,});
+      console.log('Added production:', rhs);
+      const items = p.items;
+      console.log(items.map(t => t.toString()).join('\n'));
+    }
+  }
+
+
 }
 
 main();
