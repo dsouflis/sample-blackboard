@@ -33,9 +33,9 @@ OPENAI_API_KEY=xxxxxxxxxxxxxxxxxxxxxxxxxx
 
 We have a set of cages with animals of different species and genders at a river bank. We want to transfer 
 them to the other side of the river. The boat has a single cage where a number of animals can fit, if their total 
-weight is below some threshold. The manifest does not contain each animal's weight, so we have to determine the
-average weight of an individual of each species. We want to make as few trips as possible, so, we group animals 
-together unless it is not feasible because one is a danger to some other one.
+weight is below some threshold, and if no animal eats any other. The manifest does not contain each animal's weight, 
+so we have to determine the average weight of an individual of each species. We want to make as few trips as possible, 
+so, we group animals together unless it is not feasible because one is a danger to some other one.
 
 ## The knowledge sources
 
@@ -208,8 +208,8 @@ Transitioned to state 3
 This production uses the following 'assistant' directive.
 
 > Given a list of species, respond with lines of knowledge triples in the
-form of 'species,eats,species' on each line. Exclude triples that use species
-not provided in the list. Avoid stopwords and any other text than the list of triples.
+> form of 'species,eats,species' on each line. Exclude triples that use species
+> not provided in the list. Avoid stopwords and any other text than the list of triples.
  
 It ends up adding the following triples: `(rabbit eats grass) (wolf eats rabbit) (snake eats rabbit)`.
 
@@ -237,7 +237,7 @@ Transitioned to state 4
 This knowledge source uses the following 'assistant' directive with ChatGPT:
 
 > Given a species, respond with the average weight of an individual of the species in kilograms.
-Respond with just a number, without other words or punctuation.
+> Respond with just a number, without other words or punctuation.
 
 These facts are added during these steps (notice that exact numbers may vary from run to run): 
 `(rabbit weight 2) (wolf weight 40) (snake weight 1.5)`.
@@ -267,7 +267,15 @@ Both productions are self-transitions, so ordinarily "start trip" would be selec
 resolver we use gives precedence to "add compatible animal to trip". The reason is that we want
 to try and add as many other animals to the same trip as possible (given weight constraints and
 information about which species eats which), before starting another trip with one of the remaining
-animals. So now the first trip looks like `(trip gensym0 -) (gensym0 includes a1) (gensym0 includes a2)`.
+animals. This was done by using the following configuration for the resolver:
+
+```typescript
+  let resolver = new OverridingSelfTransitionResolver([4]);
+```
+
+If you refer to the regex definition, `4` is the "add compatible animal to trip" production.
+
+So now the first trip looks like `(trip gensym0 -) (gensym0 includes a1) (gensym0 includes a2)`.
 
 But now we can find no compatible animal. So next we see:
 
