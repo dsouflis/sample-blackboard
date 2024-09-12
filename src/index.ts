@@ -171,9 +171,8 @@ const knowledgeSource3: KnowledgeSource = {
  (<b> species <s2>) 
  -{(<t> includes <aa>) (<aa> species <ss>) (<s2> eats <ss>)} 
  -{(<t> includes <aa>) (<aa> species <ss>) (<ss> eats <s2>)} 
- (<s> weight <w>)
  (<s2> weight <w2>)
- ((<w> + <w2>) < 100)
+ ((<w2> + <wt>) < 100)
  -> "add compatible animal to trip"
 )
     `,

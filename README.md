@@ -1,12 +1,12 @@
 # Sample Blackboard
 
-This is a prototype for an implementation of a blackboard architecture, running a sample blackboard
+This is a prototype implementation of a blackboard architecture, running a sample blackboard
 which is solving a specific problem. It is based on [rete-next](https://github.com/dsouflis/rete-next), 
 another project of mine that implements a Rete engine. 
 The knowledge base maintained by Rete serves as the *blackboard*, the shared data structure through 
 which individual modules, the *knowledge sources*, collaborate.
 
-The knowledge sources are heterogeneous, each providing a unique expertise to the problem. In the sample blackboard,
+Knowledge sources are heterogeneous, each providing a unique expertise to the problem. In the sample blackboard,
 two of the knowledge sources consult ChatGPT, and two others implement regular code. The knowledge sources
 are notified about changes to the blackboard by adding productions to the Rete engine which are fired by the
 control shell of the blackboard. 
@@ -31,8 +31,8 @@ OPENAI_API_KEY=xxxxxxxxxxxxxxxxxxxxxxxxxx
 
 ## The problem
 
-The input is a set of animals of different species and genders. Each animal is caged alone. We want to transfer 
-them to the other side of a river. The boat has a single cage where a number of animals can fit, if their total 
+We have a set of cages with animals of different species and genders at a river bank. We want to transfer 
+them to the other side of the river. The boat has a single cage where a number of animals can fit, if their total 
 weight is below some threshold. The manifest does not contain each animal's weight, so we have to determine the
 average weight of an individual of each species. We want to make as few trips as possible, so, we group animals 
 together unless it is not feasible because one is a danger to some other one.
@@ -40,7 +40,7 @@ together unless it is not feasible because one is a danger to some other one.
 ## The knowledge sources
 
 Knowledge sources are defined with two things:
-- a set of productions (written in the 'Productions0' grammar of 'rete-next')
+- a set of productions (written in the ['Productions0' grammar of 'rete-next'](https://github.com/dsouflis/rete-next/blob/main/productions0.ohm))
 - the code (logic) that implements the firing of the corresponding productions
 
 Each production logic is given the set of tokens (NB. in the Rete sense) that can be added, and those that can be
@@ -83,9 +83,8 @@ Knowledge Source 3 is responsible for arranging trips, while honoring the constr
  (<b> species <s2>) 
  -{(<t> includes <aa>) (<aa> species <ss>) (<s2> eats <ss>)} 
  -{(<t> includes <aa>) (<aa> species <ss>) (<ss> eats <s2>)} 
- (<s> weight <w>)
  (<s2> weight <w2>)
- ((<w> + <w2>) < 100)
+ ((<w2> + <wt>) < 100)
  -> "add compatible animal to trip"
 )
 ```
@@ -306,8 +305,17 @@ The final state of the blackboard (the Rete working memory) is:
 (trip gensym1 -) (gensym1 includes a3) (gensym1 includes a4)
 ```
 
+NB. It has happened that a run creates three trips, because the food chain also happens to contain `(wolf eats snake)`!
+Please remember that ChatGPT responses are not deterministic.
+
 ## Conclusion
 
 That was a demonstration of how a blackboard architecture can be implemented on top of a Rete engine, and 
 also how the blackboard can serve as infrastructure to coordinate custom logic and external LLMs, without
-hardcoded data pipelines and without coupling them.
+hardcoded data pipelines and without coupling them. Although it does not specifically target the domain of
+applications powered by LLMs, like LangChain does, it can be used to create applications that coordinate 
+different LLM invocations and components around them, and LangChain can be used to create knowledge sources
+around LLMs that leverage all the very useful functionalities it offers for pre- and post-processing. The main
+idea is that of using the blackboard (a [tuple space](https://en.wikipedia.org/wiki/Tuple_space), minus
+concurrency, plus more advanced triggering mechanisms) as the lingua franca for different components to 
+interoperate, and to orchestrate their interactions using the blackboard control shell.
