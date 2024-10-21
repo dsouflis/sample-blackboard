@@ -313,7 +313,7 @@ The final state of the blackboard (the Rete working memory) is:
 (trip gensym1 -) (gensym1 includes a3) (gensym1 includes a4)
 ```
 
-NB. It has happened that a run creates three trips, because the food chain also happens to contain `(wolf eats snake)`!
+NB. It has happened that a run creates three trips, when the food chain also happens to contain `(wolf eats snake)`!
 Please remember that ChatGPT responses are not deterministic.
 
 ## Conclusion
