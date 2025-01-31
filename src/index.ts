@@ -130,8 +130,8 @@ const knowledgeSource2: KnowledgeSource = {
       let willFire = production.willFireTokenAdded(token);
       if (willFire) {
         let evalVariables = evalVariablesInToken(['s'], locations, token);
-        let species = evalVariables['s'];
-        if (species !== null) {
+        let species: string | undefined = evalVariables['s'];
+        if (species !== undefined) {
           console.log('Retrieving average weight for:', species);
 
           let message = await getOpenAiResponse(
@@ -237,7 +237,7 @@ function registerKnowledgeSourceProductions(rete: Rete, productionsText: string,
   const productions: ProductionDataArray = [];
   let logicIndex = 0;
   for (const {lhs, rhs} of parsed.specs) {
-    let p = rete.addProduction(lhs, rhs);
+    let p = rete.addProduction(lhs, rhs!);
     let variables = getVariables(lhs);
     let locationsOfVariablesInConditions = getLocationsOfVariablesInConditions(variables, lhs);
     productions.push({ production: p, locations: locationsOfVariablesInConditions, logic: productionLogics[logicIndex++]});
